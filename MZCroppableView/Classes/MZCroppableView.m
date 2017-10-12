@@ -167,6 +167,9 @@
 }
 - (UIImage *)deleteBackgroundOfImage:(UIImageView *)image
 {
+    // buggy code cropping output
+    // do not use this function
+    // this function has been cut into separate functions and cropping is done with another function locaed at UIImage+PECrop.h 
     NSArray *points = [self.croppingPath points];
     
     CGRect rect = CGRectZero;
