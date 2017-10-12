@@ -72,16 +72,93 @@
     [self.lineColor setStroke];
     [self.croppingPath strokeWithBlendMode:kCGBlendModeNormal alpha:1.0f];
 }
-- (UIImage *)deleteBackgroundOfImage:(UIImageView *)image
+
+- (UIBezierPath*) cropPath:(UIImageView*)image
 {
     NSArray *points = [self.croppingPath points];
     
     CGRect rect = CGRectZero;
     rect.size = image.image.size;
     
+    UIBezierPath *aPath;
+    aPath = [UIBezierPath bezierPath];
+     //   CGRect pathRect = CGPathGetPathBoundingBox(path);
+        // Set the starting point of the shape.
+        CGPoint p1 = [MZCroppableView convertCGPoint:[[points objectAtIndex:0] CGPointValue] fromRect1:image.frame.size toRect2:image.image.size];
+        [aPath moveToPoint:CGPointMake(p1.x, p1.y)];
+        
+        for (uint i=1; i<points.count; i++)
+        {
+            CGPoint p = [MZCroppableView convertCGPoint:[[points objectAtIndex:i] CGPointValue] fromRect1:image.frame.size toRect2:image.image.size];
+            [aPath addLineToPoint:CGPointMake(p.x, p.y)];
+        }
+   
+    return aPath;
+}
+
+
+- (UIImage *)croppedImageInRect:(CGRect)rect
+{
+    double (^rad)(double) = ^(double deg) {
+        return deg / 180.0 * M_PI;
+    };
+    
+    CGAffineTransform rectTransform;
+    switch (self.imageOrientation) {
+        case UIImageOrientationLeft:
+            rectTransform = CGAffineTransformTranslate(CGAffineTransformMakeRotation(rad(90)), 0, -self.size.height);
+            break;
+        case UIImageOrientationRight:
+            rectTransform = CGAffineTransformTranslate(CGAffineTransformMakeRotation(rad(-90)), -self.size.width, 0);
+            break;
+        case UIImageOrientationDown:
+            rectTransform = CGAffineTransformTranslate(CGAffineTransformMakeRotation(rad(-180)), -self.size.width, -self.size.height);
+            break;
+        default:
+            rectTransform = CGAffineTransformIdentity;
+    };
+    rectTransform = CGAffineTransformScale(rectTransform, self.scale, self.scale);
+    
+    CGImageRef imageRef = CGImageCreateWithImageInRect([self CGImage], CGRectApplyAffineTransform(rect, rectTransform));
+    UIImage *result = [UIImage imageWithCGImage:imageRef scale:self.scale orientation:self.imageOrientation];
+    CGImageRelease(imageRef);
+    
+    return result;
+}
+
+- (CGRect) cropRect:(UIImageView*)image
+{
+    NSArray *points = [self.croppingPath points];
+    
+    CGRect rect = CGRectZero;
+    rect.size = image.image.size;
     
     UIBezierPath *aPath;
-    UIGraphicsBeginImageContextWithOptions(rect.size, YES, 0.0);
+    aPath = [UIBezierPath bezierPath];
+    //   CGRect pathRect = CGPathGetPathBoundingBox(path);
+    // Set the starting point of the shape.
+    CGPoint p1 = [MZCroppableView convertCGPoint:[[points objectAtIndex:0] CGPointValue] fromRect1:image.frame.size toRect2:image.image.size];
+    [aPath moveToPoint:CGPointMake(p1.x, p1.y)];
+    
+    for (uint i=1; i<points.count; i++)
+    {
+        CGPoint p = [MZCroppableView convertCGPoint:[[points objectAtIndex:i] CGPointValue] fromRect1:image.frame.size toRect2:image.image.size];
+        [aPath addLineToPoint:CGPointMake(p.x, p.y)];
+    }
+    CGRect croppedRect = aPath.bounds;
+    croppedRect.origin.y = rect.size.height - CGRectGetMaxY(aPath.bounds);//This because mask become inverse of the actual image;
+    return croppedRect;
+}
+
+- (UIImage*) buildMaskImage:(UIImageView*)image
+{
+    NSArray *points = [self.croppingPath points];
+    
+    CGRect rect = CGRectZero;
+    rect.size = image.image.size;
+    
+    UIBezierPath *aPath;
+    UIGraphicsBeginImageContextWithOptions(rect.size, YES, 0);
     {
         [[UIColor blackColor] setFill];
         UIRectFill(rect);
@@ -105,7 +182,51 @@
     UIImage *mask = UIGraphicsGetImageFromCurrentImageContext();
     UIGraphicsEndImageContext();
     
-    UIGraphicsBeginImageContextWithOptions(rect.size, NO, 0.0);
+    UIGraphicsBeginImageContextWithOptions(rect.size, NO, 0);
+    
+    {
+        CGContextClipToMask(UIGraphicsGetCurrentContext(), rect, mask.CGImage);
+        [image.image drawAtPoint:CGPointZero];
+    }
+    
+    UIImage *maskedImage = UIGraphicsGetImageFromCurrentImageContext();
+    UIGraphicsEndImageContext();
+    return maskedImage;
+}
+- (UIImage *)deleteBackgroundOfImage:(UIImageView *)image
+{
+    NSArray *points = [self.croppingPath points];
+    
+    CGRect rect = CGRectZero;
+    rect.size = image.image.size;
+    
+    
+    UIBezierPath *aPath;
+    UIGraphicsBeginImageContextWithOptions(rect.size, YES, 0);
+    {
+        [[UIColor blackColor] setFill];
+        UIRectFill(rect);
+        [[UIColor whiteColor] setFill];
+        
+        aPath = [UIBezierPath bezierPath];
+        
+        // Set the starting point of the shape.
+        CGPoint p1 = [MZCroppableView convertCGPoint:[[points objectAtIndex:0] CGPointValue] fromRect1:image.frame.size toRect2:image.image.size];
+        [aPath moveToPoint:CGPointMake(p1.x, p1.y)];
+        
+        for (uint i=1; i<points.count; i++)
+        {
+            CGPoint p = [MZCroppableView convertCGPoint:[[points objectAtIndex:i] CGPointValue] fromRect1:image.frame.size toRect2:image.image.size];
+            [aPath addLineToPoint:CGPointMake(p.x, p.y)];
+        }
+        [aPath closePath];
+        [aPath fill];
+    }
+    
+    UIImage *mask = UIGraphicsGetImageFromCurrentImageContext();
+    UIGraphicsEndImageContext();
+    
+    UIGraphicsBeginImageContextWithOptions(rect.size, NO, 0);
     
     {
         CGContextClipToMask(UIGraphicsGetCurrentContext(), rect, mask.CGImage);
