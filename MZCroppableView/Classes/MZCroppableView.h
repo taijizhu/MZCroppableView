@@ -17,7 +17,8 @@
 @property(nonatomic, assign) float lineWidth;
 
 - (id)initWithImageView:(UIImageView *)imageView;
-
+- (UIImage*) buildMaskImage:(UIImageView*)image;
+- (CGRect) cropRect:(UIImageView*)image;
 + (CGPoint)convertPoint:(CGPoint)point1 fromRect1:(CGSize)rect1 toRect2:(CGSize)rect2;
 + (CGRect)scaleRespectAspectFromRect1:(CGRect)rect1 toRect2:(CGRect)rect2;
 
